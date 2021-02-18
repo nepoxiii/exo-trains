@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+              content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Théo ESPY DC3DEV - trains</title>
+    </head>
+    <body>
+
+        <main>
+            <select id="sl1">
+            </select>
+            <select id="sl2">
+            </select>
+            <button onclick="process()">valider</button>
+        </main>
+
+        <br>
+
+        <div id="div-res"></div>
+
+        <script type="text/javascript">
+
+            const divRes = document.getElementById('div-res')
+            const divSl1 = document.getElementById('sl1')
+            const divSl2 = document.getElementById('sl2')
+
+            // construction du DOM
+            fetch("AventuriersDuRailEurope.json")
+                .then(response => response.json())
+                .then(tab => {
+                    let dom = ''
+                    const allNodes = []
+
+                    tab.forEach(({ nodes }) => {
+                        nodes.forEach(item => {
+                            let ok = true
+                            allNodes.forEach(cloneItem => {
+                                if (cloneItem === item) {
+                                    ok = false
+                                }
+                            })
+                            if (ok) allNodes.push(item)
+                        })
+                    })
+                    allNodes.forEach(item => dom += `<option value="${item}">${item}</option>`)
+
+                    divSl1.innerHTML = dom
+                    divSl2.innerHTML = dom
+                })
+
+            // algorithme
+            const process = () => {
+
+                const start = divSl1.value
+                const end = divSl2.value
+
+                fetch("AventuriersDuRailEurope.json")
+                    .then(response => response.json())
+                    .then(tab => {
+                        // on cherche les voisins
+                        const voisins = near(tab, start, end)
+                        console.log(voisins)
+                        divRes.innerHTML = voisins[voisins.length - 1].travel.title
+                    })
+
+            }
+
+            // track voisins
+            const near = (tab, to, end, res = []) => {
+                tab.forEach(({ weight, nodes }) => {
+                    if (nodes[0] === to) {
+                        control(res, nodes[0], nodes[1], weight, tab, end)
+                    } else if (nodes[1] === to) {
+                        control(res, nodes[1], nodes[0], weight, tab, end)
+                    }
+                })
+                return res
+            }
+
+            // on control où on en ai dans le voyage
+            const control = (res, newFrom, newTo, weight, tab, end) => {
+                let ok = true
+                let stop = false
+                if (res.length !== 0) {
+                    res.forEach(({ travel }) => {
+                        travel.register.forEach(({ from }) => {
+                            // on est déjà passé par la au par avant
+                            if (newTo === from) ok = false
+                            // on est arrivé à destination, on stop
+                            if (newTo === end) {
+                                ok = false
+                                stop = true
+                            }
+                        })
+                    })
+                }
+                if (ok) register(res, newFrom, newTo, weight, tab, end)
+                // on relance un autre chemin
+                // if (stop) near(tab, to, end)
+            }
+
+            // on enregistre le voyage
+            const register = (res, from, to, weight, tab, end) => {
+                let newTravel = {}
+                if (res.length === 0) {
+                    // calcul initialise le premier voyage
+                    newTravel = {
+                        title: from,
+                        register: [{ from, to }],
+                        weight
+                    }
+                } else {
+                    // on regarde les anciens voyage pour calculer le nouveau
+                    res.forEach(({ travel }) => {
+                        newTravel = {
+                            title: travel.title + ' → ' + to,
+                            register: [...travel.register, { from, to }],
+                            weight: travel.weight + weight
+                        }
+                    })
+                }
+                // on control avant d'enregistrer
+                 // la destination a été atteinte ?
+                  // on stop l'algo
+                 // on a trouvé un point commun et on garde le chemin le moins lourd
+                 // sinon on enregistre
+                res.push({ from, to, weight, travel: newTravel })
+                // on lance la prochaine étape de recherche du parcours
+                near(tab, to, end, res)
+            }
+
+        </script>
+    </body>
+</html>
